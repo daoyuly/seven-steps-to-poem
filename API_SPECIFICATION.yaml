@@ -1,0 +1,1174 @@
+openapi: 3.0.3
+info:
+  title: Seven Steps to Poem API
+  description: AI Agent system for automated business problem solving using McKinsey's 7-step methodology
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: api-support@sevenstepstopoem.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.sevenstepstopoem.com/v1
+    description: Production server
+  - url: https://staging-api.sevenstepstopoem.com/v1
+    description: Staging server
+  - url: http://localhost:8000/v1
+    description: Development server
+
+security:
+  - BearerAuth: []
+
+paths:
+  /problems:
+    post:
+      summary: Create a new problem analysis request
+      description: Submit a business problem for AI agent analysis
+      tags:
+        - Problems
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - raw_text
+                - submitter
+              properties:
+                raw_text:
+                  type: string
+                  description: Natural language description of the business problem
+                  example: "Our SaaS customer churn rate has increased 20% over the past 3 months. We need to reduce it by 5% within 90 days."
+                submitter:
+                  type: string
+                  format: email
+                  description: Email address of the person submitting the problem
+                  example: "john.doe@company.com"
+                attachments:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Supporting files (PDF, CSV, XLSX)
+                urgency:
+                  type: string
+                  enum: [low, medium, high, critical]
+                  default: medium
+                  description: Priority level of the problem
+                metadata:
+                  type: object
+                  description: Additional context and metadata
+                  properties:
+                    industry:
+                      type: string
+                      example: "SaaS"
+                    company_size:
+                      type: string
+                      enum: [startup, small, medium, large, enterprise]
+                    budget_range:
+                      type: string
+                      example: "$10K-50K"
+      responses:
+        '201':
+          description: Problem created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '429':
+          description: Rate limit exceeded
+
+    get:
+      summary: List all problems for the authenticated user
+      description: Retrieve a paginated list of problems
+      tags:
+        - Problems
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [created, framing, tree_generation, prioritizing, planning, analyzing, synthesizing, presenting, completed, failed]
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [created_at, updated_at, urgency]
+            default: created_at
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        '200':
+          description: List of problems
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  problems:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProblemSummary'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+
+  /problems/{problem_id}:
+    get:
+      summary: Get problem details
+      description: Retrieve detailed information about a specific problem
+      tags:
+        - Problems
+      parameters:
+        - name: problem_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Problem details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: Problem not found
+
+    delete:
+      summary: Delete a problem
+      description: Delete a problem and all associated data
+      tags:
+        - Problems
+      parameters:
+        - name: problem_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Problem deleted successfully
+        '404':
+          description: Problem not found
+
+  /problems/{problem_id}/frame:
+    get:
+      summary: Get problem framing results
+      description: Retrieve the structured problem frame
+      tags:
+        - Analysis Steps
+      parameters:
+        - name: problem_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Problem frame data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemFrame'
+        '404':
+          description: Problem not found
+        '409':
+          description: Framing not yet completed
+
+    post:
+      summary: Update problem frame
+      description: Provide clarifications or updates to the problem frame
+      tags:
+        - Analysis Steps
+      parameters:
+        - name: problem_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProblemFrameUpdate'
+      responses:
+        '200':
+          description: Problem frame updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemFrame'
+
+  /problems/{problem_id}/tree:
+    get:
+      summary: Get issue tree
+      description: Retrieve the MECE problem decomposition tree
+      tags:
+        - Analysis Steps
+      parameters:
+        - name: problem_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Issue tree data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssueTree'
+
+  /problems/{problem_id}/priorities:
+    get:
+      summary: Get prioritization results
+      description: Retrieve impact×feasibility scoring for tree nodes
+      tags:
+        - Analysis Steps
+      parameters:
+        - name: problem_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Prioritization results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrioritizationResults'
+
+    post:
+      summary: Update priorities
+      description: Override or adjust AI-generated priorities
+      tags:
+        - Analysis Steps
+      parameters:
+        - name: problem_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                priority_updates:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      node_id:
+                        type: string
+                      impact_score:
+                        type: integer
+                        minimum: 1
+                        maximum: 10
+                      feasibility_score:
+                        type: integer
+                        minimum: 1
+                        maximum: 10
+                      rationale:
+                        type: string
+      responses:
+        '200':
+          description: Priorities updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrioritizationResults'
+
+  /problems/{problem_id}/plans:
+    get:
+      summary: Get analysis plans
+      description: Retrieve generated analysis execution plans
+      tags:
+        - Analysis Steps
+      parameters:
+        - name: problem_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Analysis plans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AnalysisPlan'
+
+  /problems/{problem_id}/run-step:
+    post:
+      summary: Execute analysis step
+      description: Trigger execution of a specific analysis step
+      tags:
+        - Analysis Steps
+      parameters:
+        - name: problem_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - step
+              properties:
+                step:
+                  type: string
+                  enum: [frame, tree, prioritize, plan, analyze, synthesize, present]
+                  description: The analysis step to execute
+                options:
+                  type: object
+                  description: Step-specific options
+                  properties:
+                    force_refresh:
+                      type: boolean
+                      default: false
+                      description: Force re-execution even if results exist
+                    include_artifacts:
+                      type: boolean
+                      default: true
+                      description: Include generated artifacts in response
+      responses:
+        '202':
+          description: Step execution started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  execution_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [queued, running, completed, failed]
+                  estimated_duration:
+                    type: integer
+                    description: Estimated duration in seconds
+        '409':
+          description: Step already in progress
+
+  /problems/{problem_id}/executions/{execution_id}:
+    get:
+      summary: Get execution status
+      description: Check the status of a running analysis step
+      tags:
+        - Execution
+      parameters:
+        - name: problem_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: execution_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Execution status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionStatus'
+
+  /problems/{problem_id}/analysis:
+    get:
+      summary: Get analysis results
+      description: Retrieve all analysis artifacts and results
+      tags:
+        - Analysis Steps
+      parameters:
+        - name: problem_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Analysis results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AnalysisResult'
+
+  /problems/{problem_id}/recommendations:
+    get:
+      summary: Get synthesized recommendations
+      description: Retrieve final recommendations and action plans
+      tags:
+        - Analysis Steps
+      parameters:
+        - name: problem_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Recommendations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Recommendation'
+
+  /problems/{problem_id}/deliverables:
+    get:
+      summary: Get presentation deliverables
+      description: Retrieve generated presentations, reports, and media files
+      tags:
+        - Deliverables
+      parameters:
+        - name: problem_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Available deliverables
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ppt_url:
+                    type: string
+                    format: uri
+                    description: Download URL for PowerPoint presentation
+                  pdf_url:
+                    type: string
+                    format: uri
+                    description: Download URL for PDF report
+                  video_url:
+                    type: string
+                    format: uri
+                    description: Download URL for video presentation
+                  audio_url:
+                    type: string
+                    format: uri
+                    description: Download URL for audio summary
+                  executive_summary:
+                    type: object
+                    properties:
+                      short_version:
+                        type: string
+                        description: 1-page executive summary
+                      long_version:
+                        type: string
+                        description: Detailed executive summary
+                  generated_at:
+                    type: string
+                    format: date-time
+
+  /problems/{problem_id}/deliverables/{format}:
+    get:
+      summary: Download specific deliverable
+      description: Download a specific format of the problem solution
+      tags:
+        - Deliverables
+      parameters:
+        - name: problem_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: format
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [ppt, pdf, video, audio, executive-summary]
+      responses:
+        '200':
+          description: File download
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Deliverable not found or not ready
+
+  /problems/{problem_id}/audit-trail:
+    get:
+      summary: Get audit trail
+      description: Retrieve complete audit trail for the problem analysis
+      tags:
+        - Audit
+      parameters:
+        - name: problem_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Audit trail
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuditEntry'
+
+  /problems/{problem_id}/feedback:
+    post:
+      summary: Provide feedback
+      description: Submit feedback on analysis results
+      tags:
+        - Feedback
+      parameters:
+        - name: problem_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                feedback_text:
+                  type: string
+                improvement_suggestions:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: Feedback submitted
+
+  /health:
+    get:
+      summary: Health check
+      description: Check API health and service status
+      tags:
+        - System
+      security: []
+      responses:
+        '200':
+          description: System health
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, degraded, unhealthy]
+                  timestamp:
+                    type: string
+                    format: date-time
+                  services:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        enum: [up, down]
+                      queue:
+                        type: string
+                        enum: [up, down]
+                      agents:
+                        type: object
+                        additionalProperties:
+                          type: string
+                          enum: [up, down]
+
+  /metrics:
+    get:
+      summary: Get system metrics
+      description: Retrieve system performance and usage metrics
+      tags:
+        - System
+      responses:
+        '200':
+          description: System metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_problems:
+                    type: integer
+                  active_problems:
+                    type: integer
+                  success_rate:
+                    type: number
+                    format: float
+                  average_processing_time:
+                    type: integer
+                    description: Average processing time in seconds
+                  agent_performance:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        success_rate:
+                          type: number
+                        avg_duration:
+                          type: integer
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ProblemResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [created, framing_pending]
+        created_at:
+          type: string
+          format: date-time
+        estimated_completion:
+          type: string
+          format: date-time
+
+    ProblemSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        urgency:
+          type: string
+        progress_percentage:
+          type: integer
+          minimum: 0
+          maximum: 100
+
+    ProblemDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        raw_text:
+          type: string
+        submitter:
+          type: string
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+        progress:
+          type: object
+          properties:
+            current_step:
+              type: string
+            completed_steps:
+              type: array
+              items:
+                type: string
+            progress_percentage:
+              type: integer
+
+    ProblemFrame:
+      type: object
+      properties:
+        goal:
+          type: string
+          example: "Reduce SaaS customer churn rate by 5% within 90 days"
+        scope:
+          type: object
+          properties:
+            include:
+              type: array
+              items:
+                type: string
+              example: ["North American paid customers", "Enterprise tier"]
+            exclude:
+              type: array
+              items:
+                type: string
+              example: ["Free trial users", "Beta customers"]
+        kpis:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              baseline:
+                type: number
+              target:
+                type: number
+              window:
+                type: string
+              unit:
+                type: string
+        stakeholders:
+          type: array
+          items:
+            type: string
+        assumptions:
+          type: array
+          items:
+            type: string
+        constraints:
+          type: array
+          items:
+            type: string
+        confidence:
+          type: string
+          enum: [low, medium, high]
+        clarifying_questions:
+          type: array
+          items:
+            type: object
+            properties:
+              question:
+                type: string
+              category:
+                type: string
+              required:
+                type: boolean
+
+    ProblemFrameUpdate:
+      type: object
+      properties:
+        clarifications:
+          type: object
+          additionalProperties:
+            type: string
+        updated_assumptions:
+          type: array
+          items:
+            type: string
+        additional_constraints:
+          type: array
+          items:
+            type: string
+
+    IssueTree:
+      type: object
+      properties:
+        root:
+          $ref: '#/components/schemas/TreeNode'
+        visualization_data:
+          type: object
+          description: D3.js compatible data structure
+
+    TreeNode:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        hypotheses:
+          type: array
+          items:
+            type: string
+        required_data:
+          type: array
+          items:
+            type: string
+        priority_hint:
+          type: string
+          enum: [high, medium, low]
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/TreeNode'
+        notes:
+          type: string
+
+    PrioritizationResults:
+      type: object
+      properties:
+        scored_nodes:
+          type: array
+          items:
+            type: object
+            properties:
+              node_id:
+                type: string
+              impact_score:
+                type: integer
+                minimum: 1
+                maximum: 10
+              feasibility_score:
+                type: integer
+                minimum: 1
+                maximum: 10
+              priority_score:
+                type: number
+                format: float
+              rationale:
+                type: string
+              estimated_cost:
+                type: object
+                properties:
+                  hours:
+                    type: integer
+                  dollars:
+                    type: integer
+              confidence:
+                type: number
+                format: float
+        recommended_order:
+          type: array
+          items:
+            type: string
+
+    AnalysisPlan:
+      type: object
+      properties:
+        task_id:
+          type: string
+          format: uuid
+        question_id:
+          type: string
+        title:
+          type: string
+        methods:
+          type: array
+          items:
+            type: string
+            enum: [cohort, regression, segmentation, correlation, causal_inference, time_series, clustering]
+        data_requirements:
+          type: array
+          items:
+            type: object
+            properties:
+              source:
+                type: string
+              table:
+                type: string
+              columns:
+                type: array
+                items:
+                  type: string
+              filters:
+                type: string
+        estimated_hours:
+          type: integer
+        owner:
+          type: string
+        dependencies:
+          type: array
+          items:
+            type: string
+        acceptance_criteria:
+          type: array
+          items:
+            type: string
+
+    AnalysisResult:
+      type: object
+      properties:
+        task_id:
+          type: string
+          format: uuid
+        artifacts:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                enum: [chart, csv, notebook, model, sql_query]
+              url:
+                type: string
+                format: uri
+              description:
+                type: string
+              metadata:
+                type: object
+        summary:
+          type: string
+        key_findings:
+          type: array
+          items:
+            type: string
+        metrics:
+          type: object
+          additionalProperties:
+            type: number
+        confidence_score:
+          type: number
+          format: float
+        execution_time:
+          type: integer
+          description: Execution time in seconds
+        completed_at:
+          type: string
+          format: date-time
+
+    Recommendation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        summary:
+          type: string
+        evidence:
+          type: array
+          items:
+            type: string
+        actions:
+          type: array
+          items:
+            type: object
+            properties:
+              step:
+                type: string
+              description:
+                type: string
+              owner:
+                type: string
+              due_date:
+                type: string
+                format: date
+              estimated_effort:
+                type: string
+              success_criteria:
+                type: string
+        expected_impact:
+          type: object
+          properties:
+            kpi:
+              type: string
+            delta_percentage:
+              type: number
+            delta_absolute:
+              type: number
+            timeframe:
+              type: string
+        risks:
+          type: array
+          items:
+            type: object
+            properties:
+              risk:
+                type: string
+              mitigation:
+                type: string
+              probability:
+                type: string
+                enum: [low, medium, high]
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 3
+
+    ExecutionStatus:
+      type: object
+      properties:
+        execution_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [queued, running, completed, failed, cancelled]
+        progress_percentage:
+          type: integer
+          minimum: 0
+          maximum: 100
+        current_activity:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        estimated_remaining:
+          type: integer
+          description: Estimated remaining time in seconds
+        logs:
+          type: array
+          items:
+            type: object
+            properties:
+              timestamp:
+                type: string
+                format: date-time
+              level:
+                type: string
+                enum: [debug, info, warning, error]
+              message:
+                type: string
+        error_details:
+          type: object
+          properties:
+            error_code:
+              type: string
+            error_message:
+              type: string
+            stack_trace:
+              type: string
+
+    AuditEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        timestamp:
+          type: string
+          format: date-time
+        action:
+          type: string
+        actor:
+          type: string
+        resource:
+          type: string
+        details:
+          type: object
+        ip_address:
+          type: string
+        user_agent:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        error_code:
+          type: string
+        error_message:
+          type: string
+        details:
+          type: object
+        timestamp:
+          type: string
+          format: date-time
+        request_id:
+          type: string
+          format: uuid
+
+    PaginationInfo:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total_items:
+          type: integer
+        total_pages:
+          type: integer
+        has_next:
+          type: boolean
+        has_previous:
+          type: boolean
+
+tags:
+  - name: Problems
+    description: Problem management and lifecycle
+  - name: Analysis Steps
+    description: Individual analysis step operations
+  - name: Execution
+    description: Analysis execution monitoring
+  - name: Deliverables
+    description: Generated presentations and reports
+  - name: Audit
+    description: Audit trail and compliance
+  - name: Feedback
+    description: User feedback collection
+  - name: System
+    description: System health and monitoring
