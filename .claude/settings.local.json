@@ -3,7 +3,11 @@
     "allow": [
       "Bash(mkdir:*)",
       "Bash(chmod:*)",
-      "Bash(touch:*)"
+      "Bash(touch:*)",
+      "Bash(rm:*)",
+      "WebSearch",
+      "WebFetch(domain:openai.github.io)",
+      "WebFetch(domain:cookbook.openai.com)"
     ],
     "deny": [],
     "ask": []
